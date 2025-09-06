@@ -13,8 +13,7 @@
   const VERSION = "4.0.0";
   const IS_DEV = false;
   // URL base raw para seu repositório
-const REPO_PATH = "https://raw.githubusercontent.com/realdokazx-droid/Khanware/main/Khanware-main/";
-
+  const REPO_PATH = "https://raw.githubusercontent.com/realdokazx-droid/Khanware/main/Khanware-main/";
 
   /** ========== ESTADO GLOBAL ========== */
   const state = {
@@ -67,6 +66,9 @@ const REPO_PATH = "https://raw.githubusercontent.com/realdokazx-droid/Khanware/m
     isApple: () => /iPhone|iPad|Macintosh|Mac OS X/i.test(navigator.userAgent),
     isMobile: () => /Android|iPhone|Tablet|Mobile/i.test(navigator.userAgent)
   };
+
+  /** ========== DEFINIR debug PARA EVITAR ERRO ========== */
+  window.debug = (...args) => console.debug(...args);
 
   /** ========== VERIFICAÇÕES INICIAIS ========== */
   if (!/khanacademy\.org/.test(window.location.hostname)) {
@@ -141,7 +143,11 @@ const REPO_PATH = "https://raw.githubusercontent.com/realdokazx-droid/Khanware/m
     ];
 
     for (const module of modules) {
-      await utils.loadScript(REPO_PATH + module, module.split("/").pop());
+      try {
+        await utils.loadScript(REPO_PATH + module, module.split("/").pop());
+      } catch (e) {
+        console.error(`Erro ao carregar módulo ${module}:`, e);
+      }
     }
   };
 
@@ -163,5 +169,3 @@ const REPO_PATH = "https://raw.githubusercontent.com/realdokazx-droid/Khanware/m
 
   hideSplash();
 })();
-
-
