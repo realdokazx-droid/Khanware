@@ -13,7 +13,7 @@
   const VERSION = "4.0.0";
   const IS_DEV = false;
   // URL base raw para seu repositório
-  const REPO_PATH = `https://raw.githubusercontent.com/realdokazx-droid/Khanware/main/`;
+const REPO_PATH = `https://raw.githubusercontent.com/realdokazx-droid/Khanware/main/`;
 
   /** ========== ESTADO GLOBAL ========== */
   const state = {
@@ -162,3 +162,4 @@
 
   hideSplash();
 })();
+
