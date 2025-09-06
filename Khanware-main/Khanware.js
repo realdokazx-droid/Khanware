@@ -9,9 +9,6 @@
 (async () => {
   "use strict";
 
-  // Definir debug para evitar erro no console
-  window.debug = (...args) => console.debug(...args);
-
   /** ========== CONFIGURAÇÕES ========== */
   const VERSION = "4.0.0";
   const IS_DEV = false;
@@ -41,13 +38,9 @@
     delay: ms => new Promise(res => setTimeout(res, ms)),
 
     loadScript: async (url, label) => {
-      try {
-        const code = await fetch(url).then(r => r.text());
-        state.loadedPlugins.push(label);
-        eval(code);
-      } catch (err) {
-        console.error(`Erro ao carregar script ${label}:`, err);
-      }
+      const code = await fetch(url).then(r => r.text());
+      state.loadedPlugins.push(label);
+      eval(code);
     },
 
     loadCss: url => {
@@ -72,6 +65,9 @@
     isApple: () => /iPhone|iPad|Macintosh|Mac OS X/i.test(navigator.userAgent),
     isMobile: () => /Android|iPhone|Tablet|Mobile/i.test(navigator.userAgent)
   };
+
+  // Definir debug para evitar erro
+  window.debug = (...args) => console.debug(...args);
 
   /** ========== VERIFICAÇÕES INICIAIS ========== */
   if (!/khanacademy\.org/.test(window.location.hostname)) {
@@ -102,7 +98,16 @@
     setTimeout(() => splash.remove(), 1000);
   };
 
-  /** ========== BUSCAR PERFIL DO USUÁRIO ========== */
+  /** ========== OBTER USUÁRIO DA PÁGINA (fallback) ========== */
+  function getUsernameFromPage() {
+    // Tenta pegar de algum seletor comum ou variável global da KA
+    const el = document.querySelector('.username') || document.querySelector('[data-username]');
+    if (el) return el.textContent.trim();
+    if (window.KA && KA.currentUser && KA.currentUser.username) return KA.currentUser.username;
+    return "Desconhecido";
+  }
+
+  /** ========== BUSCAR PERFIL DO USUÁRIO VIA API ========== */
   const loadUserProfile = async () => {
     try {
       const res = await fetch("https://pt.khanacademy.org/api/internal/graphql/getFullUserProfile", {
@@ -115,21 +120,19 @@
         headers: { "Content-Type": "application/json" }
       });
 
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();
       const userData = data.data.user;
 
-      state.user = {
+      return {
         username: userData.username,
         nickname: userData.nickname,
         UID: userData.id.slice(-5)
       };
     } catch (err) {
-      console.error("Erro ao buscar usuário:", err);
-      state.user = { username: "Desconhecido", nickname: "Visitante", UID: "00000" };
+      console.error("Erro ao buscar usuário pela API:", err);
+      return null;
     }
   };
 
@@ -159,7 +162,16 @@
   showSplash();
 
   await loadDependencies();
-  await loadUserProfile();
+
+  let user = await loadUserProfile();
+
+  if (!user) {
+    // fallback para pegar usuário do DOM ou variável global
+    const username = getUsernameFromPage();
+    user = { username, nickname: username, UID: "00000" };
+  }
+
+  state.user = user;
 
   utils.toast("🌿 Khanware carregado com sucesso!");
   utils.toast(`⭐ Bem-vindo(a), ${state.user.nickname}`);
@@ -172,4 +184,5 @@
   await loadModules();
 
   hideSplash();
+
 })();
