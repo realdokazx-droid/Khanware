@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Khanware Cleaner
-// @version      4.0.0
+// @version      4.0.1
 // @description  Ferramenta Educativa para Khan Academy (Interface, Estilo e Automação)
 // @match        *://*.khanacademy.org/*
 // @grant        none
@@ -10,7 +10,7 @@
   "use strict";
 
   /** ========== CONFIGURAÇÕES ========== */
-  const VERSION = "4.0.0";
+  const VERSION = "4.0.1";
   const IS_DEV = false;
   const REPO_PATH = "https://raw.githubusercontent.com/realdokazx-droid/Khanware/main/Khanware-main/";
 
@@ -38,28 +38,39 @@
     delay: ms => new Promise(res => setTimeout(res, ms)),
 
     loadScript: async (url, label) => {
-      const code = await fetch(url).then(r => r.text());
-      state.loadedPlugins.push(label);
-      eval(code);
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Falha ao carregar script ${label}: HTTP ${response.status}`);
+        const code = await response.text();
+        state.loadedPlugins.push(label);
+        eval(code);
+      } catch (err) {
+        console.error(`Erro ao carregar script ${label}:`, err);
+      }
     },
 
     loadCss: url => {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = url;
-      document.head.appendChild(link);
+      if (!document.querySelector(`link[href="${url}"]`)) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = url;
+        document.head.appendChild(link);
+      }
     },
 
     toast: (msg, duration = 3000) => {
-      Toastify({
-        text: msg,
-        duration,
-        gravity: "bottom",
-        position: "center",
-        stopOnFocus: true,
-        style: { background: "#000" }
-      }).showToast();
-      console.debug(`[Toast] ${msg}`);
+      if (window.Toastify) {
+        Toastify({
+          text: msg,
+          duration,
+          gravity: "bottom",
+          position: "center",
+          stopOnFocus: true,
+          style: { background: "#000" }
+        }).showToast();
+      } else {
+        console.log("[Toast]", msg);
+      }
     },
 
     isApple: () => /iPhone|iPad|Macintosh|Mac OS X/i.test(navigator.userAgent),
@@ -67,7 +78,7 @@
   };
 
   // Definir debug para evitar erro
-  window.debug = (...args) => console.debug(...args);
+  if (!window.debug) window.debug = (...args) => console.debug(...args);
 
   /** ========== VERIFICAÇÕES INICIAIS ========== */
   if (!/khanacademy\.org/.test(window.location.hostname)) {
@@ -78,6 +89,8 @@
 
   /** ========== SPLASH SCREEN ========== */
   const showSplash = () => {
+    if (document.getElementById("khanware-splash")) return; // evitar duplicação
+
     const splash = document.createElement("div");
     splash.id = "khanware-splash";
     splash.style = `
@@ -100,40 +113,28 @@
 
   /** ========== OBTER USUÁRIO DA PÁGINA (fallback) ========== */
   function getUsernameFromPage() {
-    // Tenta pegar de algum seletor comum ou variável global da KA
-    const el = document.querySelector('.username') || document.querySelector('[data-username]');
-    if (el) return el.textContent.trim();
-    if (window.KA && KA.currentUser && KA.currentUser.username) return KA.currentUser.username;
-    return "Desconhecido";
+    try {
+      // Tenta pegar do objeto global KA
+      if (window.KA && KA.currentUser && KA.currentUser.username) {
+        return KA.currentUser.username;
+      }
+
+      // Busca seletor comum que contenha username
+      const el = document.querySelector('.username') || document.querySelector('[data-username]');
+      if (el) return el.textContent.trim();
+
+      return "Desconhecido";
+    } catch (e) {
+      return "Desconhecido";
+    }
   }
 
   /** ========== BUSCAR PERFIL DO USUÁRIO VIA API ========== */
   const loadUserProfile = async () => {
-    try {
-      const res = await fetch("https://pt.khanacademy.org/api/internal/graphql/getFullUserProfile", {
-        method: "POST",
-        credentials: "include",
-        body: JSON.stringify({
-          operationName: "getFullUserProfile",
-          query: `query { user { id username nickname } }`
-        }),
-        headers: { "Content-Type": "application/json" }
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data = await res.json();
-      const userData = data.data.user;
-
-      return {
-        username: userData.username,
-        nickname: userData.nickname,
-        UID: userData.id.slice(-5)
-      };
-    } catch (err) {
-      console.error("Erro ao buscar usuário pela API:", err);
-      return null;
-    }
+    // Atenção: essa API interna requer autenticação adequada, então provavelmente gerará erro 403.
+    // Vamos evitar chamar essa API para não causar erro.
+    // Em vez disso, só usar o fallback do objeto global ou DOM.
+    return null;
   };
 
   /** ========== CARREGAR DEPENDÊNCIAS ========== */
@@ -163,10 +164,10 @@
 
   await loadDependencies();
 
+  // Não usar API protegida, apenas fallback seguro
   let user = await loadUserProfile();
 
   if (!user) {
-    // fallback para pegar usuário do DOM ou variável global
     const username = getUsernameFromPage();
     user = { username, nickname: username, UID: "00000" };
   }
