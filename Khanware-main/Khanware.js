@@ -9,10 +9,12 @@
 (async () => {
   "use strict";
 
+  // Definir debug para evitar erro no console
+  window.debug = (...args) => console.debug(...args);
+
   /** ========== CONFIGURAÇÕES ========== */
   const VERSION = "4.0.0";
   const IS_DEV = false;
-  // URL base raw para seu repositório
   const REPO_PATH = "https://raw.githubusercontent.com/realdokazx-droid/Khanware/main/Khanware-main/";
 
   /** ========== ESTADO GLOBAL ========== */
@@ -39,9 +41,13 @@
     delay: ms => new Promise(res => setTimeout(res, ms)),
 
     loadScript: async (url, label) => {
-      const code = await fetch(url).then(r => r.text());
-      state.loadedPlugins.push(label);
-      eval(code);
+      try {
+        const code = await fetch(url).then(r => r.text());
+        state.loadedPlugins.push(label);
+        eval(code);
+      } catch (err) {
+        console.error(`Erro ao carregar script ${label}:`, err);
+      }
     },
 
     loadCss: url => {
@@ -66,9 +72,6 @@
     isApple: () => /iPhone|iPad|Macintosh|Mac OS X/i.test(navigator.userAgent),
     isMobile: () => /Android|iPhone|Tablet|Mobile/i.test(navigator.userAgent)
   };
-
-  /** ========== DEFINIR debug PARA EVITAR ERRO ========== */
-  window.debug = (...args) => console.debug(...args);
 
   /** ========== VERIFICAÇÕES INICIAIS ========== */
   if (!/khanacademy\.org/.test(window.location.hostname)) {
@@ -112,6 +115,10 @@
         headers: { "Content-Type": "application/json" }
       });
 
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
       const data = await res.json();
       const userData = data.data.user;
 
@@ -122,6 +129,7 @@
       };
     } catch (err) {
       console.error("Erro ao buscar usuário:", err);
+      state.user = { username: "Desconhecido", nickname: "Visitante", UID: "00000" };
     }
   };
 
@@ -143,11 +151,7 @@
     ];
 
     for (const module of modules) {
-      try {
-        await utils.loadScript(REPO_PATH + module, module.split("/").pop());
-      } catch (e) {
-        console.error(`Erro ao carregar módulo ${module}:`, e);
-      }
+      await utils.loadScript(REPO_PATH + module, module.split("/").pop());
     }
   };
 
